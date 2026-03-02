@@ -28,21 +28,26 @@ function App() {
   const [endDate, setEndDate] = useState('2026-01-30');
 
   // State for Map (Phase 4)
-  const [selectedAnomalyDate, setSelectedAnomalyDate] = useState(null);
+  useEffect(() => {
+    // Sprawdzenie, czy skrypt Python zdążył wstrzyknąć surowe dane
+    if (window.__INJECTED_SQL_DATA__ && window.__INJECTED_SQL_DATA__.length > 0) {
+      setLoadingMsg('Agregacja tysięcy rekordów bazy wstrzykniętych przez skrypt Python...');
+
+      setTimeout(() => {
+        try {
+          const processedDb = processRawSQLData(window.__INJECTED_SQL_DATA__);
+          setData(processedDb);
+          setLocations(getAvailableLocations(processedDb));
+          setLoadingMsg('');
+        } catch (err) {
+          alert('Błąd podczas przetwarzania wstrzykniętych danych: ' + err.message);
+          setLoadingMsg('');
+        }
+      }, 50);
+    }
+  }, []);
 
   const [isDragging, setIsDragging] = useState(false);
-  const [loadingMsg, setLoadingMsg] = useState('');
-
-  // Sposób na szybkie testy bez własnych danych
-  const loadMockData = () => {
-    setLoadingMsg('Generowanie i analizowanie danych modelu...');
-    setTimeout(() => {
-      const mockDb = generateMockData();
-      setData(mockDb);
-      setLocations(getAvailableLocations(mockDb));
-      setLoadingMsg('');
-    }, 100);
-  };
 
   // Ładowanie prawdziwych danych z pliku Excel/CSV
   const handleFileUpload = async (event) => {
@@ -160,23 +165,19 @@ function App() {
                       <path d="M9 15l3-3 3 3" />
                     </svg>
                   </div>
-                  <h2 className="text-3xl font-bold text-primary mb-4">Wczytaj dane z bazy (Excel)</h2>
-                  <p className="text-secondary mb-8 text-lg">Przeciągnij i upuść plik ze zrzutem tabeli PGEO (zwykły <strong>.xlsx</strong> lub .csv) uratowany z SSMS, aby przeanalizować model offline.</p>
+                  <h2 className="text-3xl font-bold text-primary mb-4">Dashboard czeka na bazę danych...</h2>
+                  <p className="text-secondary mb-8 text-lg">Aby bezpiecznie wgrać setki tysięcy rekordów omijając limit pamięci Chrome, <strong>uruchom skrypt Python (wgraj_dane.py)</strong> dostarczony z plikami i wklej w nim ścieżkę do swojego pliku Excel / CSV!</p>
 
                   <div className="flex gap-4 justify-center">
-                    <label className="cursor-pointer bg-gradient-brand text-white font-medium px-6 py-3 rounded-lg hover:shadow-xl hover:shadow-blue-500/20 transition-all flex items-center gap-2">
-                      + Wybierz plik z komputera
-                      <input type="file" accept=".xlsx, .xls, .csv" className="hidden" onChange={handleFileUpload} />
-                    </label>
                     <button
                       onClick={loadMockData}
                       className="px-6 py-3 rounded-lg border border-[var(--border-glass)] text-secondary hover:text-white hover:bg-white/5 transition-all font-medium"
                     >
-                      Lub załaduj dane testowe
+                      Brak bazy? Załaduj wbudowane dane testowe
                     </button>
                   </div>
                   <p className="text-xs text-muted mt-6 text-center opacity-70">
-                    Aplikacja analizuje setki tysięcy rekordów na żywo. Operacja odbywa się w pełni bezpiecznie wewnątrz Twojej przeglądarki, dane nie opuszczają sieci w lokalnym obiegu.
+                    Opcja przesuwania plików (Drag & Drop) została wyłączona w celu uchronienia Twojej przeglądarki przed całkowitym zawieszeniem wynikającym z ograniczeń pamięciowych dla ogromnych zrzutów z baz systemowych.
                   </p>
                 </>
               )}
