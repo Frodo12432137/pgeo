@@ -194,8 +194,8 @@ function App() {
                       <path d="M9 15l3-3 3 3" />
                     </svg>
                   </div>
-                  <h2 className="text-3xl font-bold text-primary mb-4">Dashboard czeka na bazę danych...</h2>
-                  <p className="text-secondary mb-8 text-lg">Aby bezpiecznie wgrać setki tysięcy rekordów omijając limit pamięci Chrome, <strong>uruchom skrypt Python (wgraj_dane.py)</strong> dostarczony z plikami i wklej w nim ścieżkę do swojego pliku Excel / CSV!</p>
+                  <h2 className="text-3xl font-bold text-primary mb-4">Dashboard czeka na serwer analityczny...</h2>
+                  <p className="text-secondary mb-8 text-lg">Aby wczytać dane do systemu omijając limit pamięci Chrome i Windows CORS, <strong>uruchom w tle skrypt Python: uruchom_aplikacje.py</strong> i nie zamykaj go tak długo, jak używasz Dashboardu.</p>
 
                   <div className="flex gap-4 justify-center">
                     <button
