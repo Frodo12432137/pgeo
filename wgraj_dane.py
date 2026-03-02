@@ -8,7 +8,7 @@ import base64
 # ⬇️ TUTAJ WKLEJ ŚCIEŻKĘ DO SWOJEGO PLIKU Z BAZY SSMS (EXCEL .xlsx LUB .csv) ⬇️
 # ==============================================================================
 
-SCIEZKA_DO_PLIKU = r"C:\Twoj\Folder\dane_pgeo.xlsx"
+SCIEZKA_DO_PLIKU = "mock_data.xlsx"
 
 # ==============================================================================
 
@@ -128,17 +128,39 @@ def main():
             
         print("⏳ Wstrzykiwanie danych (Base64) do silnika przeglądarki...")
         
-        # Usuwamy ewentualne stare wstrzyknięcie
+        # Usuwamy ewentualne stare wstrzyknięcie bazy
         import re
         html_content = re.sub(r'<div id="pgeo-injected-data".*?</div>', '', html_content, flags=re.DOTALL)
         html_content = re.sub(r'<script id="pgeo-data".*?</script>', '', html_content, flags=re.DOTALL)
             
-        # Zamiast wstrzykiwać luźny skrypt (który na Windowsie przez zabezpieczenia lub dziwne cudzysłowy może zostać sparsowany jako tekst HTML),
-        # wstrzykujemy to strukturalnie jako ukryty element DOM w obrębie <body>.
-        # Jest to najbezpieczniejsza istniejąca metoda przekazywania ogromnych danych do Reacta z pominięciem obostrzeń środowiska wykonawczego.
+        injected_dom_node = f'<div id="pgeo-injected-data" style="display:none;" data-b64="{b64_data}"></div>\n'
         
-        injected_dom_node = f'<div id="pgeo-injected-data" style="display:none;" data-b64="{b64_data}"></div>\n</body>'
-        new_html = html_content.replace("</body>", injected_dom_node)
+        # --- OFFLINE INJECTION BYPASS ---
+        # 1. Wyłuskujemy wszystkie tagi skryptów Inlined z heada (vite-plugin-singlefile)
+        # Chcemy sprowadzić potężną paczkę do postaci absolutnie nieblokowalnej przez restrykcje lokalnych plików
+        
+        script_tags = re.findall(r'<script.*?>.*?</script>', html_content, flags=re.DOTALL)
+        scripts_to_move = ""
+        
+        for tag in script_tags:
+            # Posiadamy tylko inlinowane skrypty (bez rel/src)
+            if 'src=' not in tag:
+                # Oczyszczamy oryginalny kod ze słowa kluczowego type="module", wymuszając klasyczne wykonanie
+                cleaned_tag = tag.replace('type="module"', '')
+                cleaned_tag = cleaned_tag.replace('crossorigin', '')
+                
+                # KLUCZOWE: Vite dokleja `export default ...` na końcu.
+                # Jest to nielegalne poza "module" i powoduje SyntaxError: Unexpected token 'export' 
+                # Usuwamy to wyrażeniem regularnym!
+                cleaned_tag = re.sub(r'export\s+default\s+\w+\(\);', '', cleaned_tag)
+                
+                scripts_to_move += cleaned_tag + '\n'
+                html_content = html_content.replace(tag, '') # Usuń z pierwotnego miejsca (head)
+        
+        # 2. Wstrzykujemy bazę Base64 ORAZ wyekstrahowany i oczyszczony silnik Aplikacji SAMIUSIEŃKI DÓŁ BODY
+        # Dzięki temu całe drzewo DOM istnieje, zanim ciężki skrypt ruszy (pozbycie się białego ekranu),
+        # i omijamy WSZYSTKIE blokady CORS (brak modułów, brak bloba).
+        new_html = html_content.replace("</body>", injected_dom_node + scripts_to_move + "</body>")
         
         output_path = os.path.join("dist", "dashboard_z_danymi.html")
         with open(output_path, 'w', encoding='utf-8') as f:
