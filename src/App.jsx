@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import * as XLSX from 'xlsx';
 import { generateMockData } from './data/mockData';
 import { filterData, getAvailableLocations, getAggregatedMetrics, processRawSQLData } from './utils/dataProcessing';
@@ -26,6 +26,8 @@ function App() {
   const [selectedLocation, setSelectedLocation] = useState('Wszystkie');
   const [startDate, setStartDate] = useState('2026-01-01');
   const [endDate, setEndDate] = useState('2026-01-30');
+  const [loadingMsg, setLoadingMsg] = useState('');
+  const [selectedAnomalyDate, setSelectedAnomalyDate] = useState(null);
 
   // State for Map (Phase 4)
   useEffect(() => {
@@ -61,6 +63,17 @@ function App() {
   }, []);
 
   const [isDragging, setIsDragging] = useState(false);
+
+  const loadMockData = () => {
+    setLoadingMsg('Generowanie danych testowych...');
+    setTimeout(() => {
+      const mockResult = generateMockData();
+      const processedDb = processRawSQLData(mockResult);
+      setData(processedDb);
+      setLocations(getAvailableLocations(processedDb));
+      setLoadingMsg('');
+    }, 500);
+  };
 
   // Ładowanie prawdziwych danych z pliku Excel/CSV
   const handleFileUpload = async (event) => {
