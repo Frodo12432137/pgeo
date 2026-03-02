@@ -29,18 +29,31 @@ function App() {
 
   // State for Map (Phase 4)
   useEffect(() => {
-    // Sprawdzenie, czy skrypt Python zdążył wstrzyknąć surowe dane
-    if (window.__INJECTED_SQL_DATA__ && window.__INJECTED_SQL_DATA__.length > 0) {
-      setLoadingMsg('Agregacja tysięcy rekordów bazy wstrzykniętych przez skrypt Python...');
+    // 1. Sprawdzenie, czy skrypt Python wstrzyknął ukrytego DIVa z Base64 (Najbezpieczniejsza metoda na Windows)
+    const injectedDataNode = document.getElementById('pgeo-injected-data');
+    if (injectedDataNode && injectedDataNode.getAttribute('data-b64')) {
+      setLoadingMsg('Rozpakowywanie wstrzykniętego bloku danych... To zajmie tylko chwilę.');
 
       setTimeout(() => {
         try {
-          const processedDb = processRawSQLData(window.__INJECTED_SQL_DATA__);
-          setData(processedDb);
-          setLocations(getAvailableLocations(processedDb));
-          setLoadingMsg('');
+          const b64Data = injectedDataNode.getAttribute('data-b64');
+          // Dekoduj z Base64 (obsługa UTF-8 na wypadek polskich, dziwnych znaków ze SQL)
+          const decodedText = decodeURIComponent(escape(window.atob(b64Data)));
+          const parsedData = JSON.parse(decodedText);
+
+          if (parsedData.length > 0) {
+            setLoadingMsg('Agregacja tysięcy rekordów Bazy Danych...');
+            setTimeout(() => {
+              const processedDb = processRawSQLData(parsedData);
+              setData(processedDb);
+              setLocations(getAvailableLocations(processedDb));
+              setLoadingMsg('');
+            }, 50);
+          } else {
+            setLoadingMsg('');
+          }
         } catch (err) {
-          alert('Błąd podczas przetwarzania wstrzykniętych danych: ' + err.message);
+          alert('Krytyczny błąd podczas dekodowania Bazy: ' + err.message);
           setLoadingMsg('');
         }
       }, 50);

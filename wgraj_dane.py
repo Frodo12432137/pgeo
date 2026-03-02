@@ -12,7 +12,63 @@ SCIEZKA_DO_PLIKU = r"C:\Twoj\Folder\dane_pgeo.xlsx"
 
 # ==============================================================================
 
+def check_environment():
+    print("=" * 60)
+    print(" 🛠️  ANalityka Środowiska (Diagnostyka Systemu) 🛠️ ")
+    print("=" * 60)
+    
+    # 1. Sprawdzanie bibliotek
+    print("[1/3] Sprawdzanie wymaganych bibliotek Pythona...")
+    try:
+        import pandas
+        print("   ✅ Pandas zainstalowany pomyślnie (wersja: " + pandas.__version__ + ")")
+    except ImportError:
+        print("   ❌ BŁĄD: Brak biblioteki Pandas!")
+        print("   -> Zainstaluj wpisując w terminalu: pip install pandas")
+        return False
+        
+    try:
+        import openpyxl
+        print("   ✅ Openpyxl zainstalowany (obsługa .xlsx)")
+    except ImportError:
+        print("   ❌ UWAGA: Brak biblioteki openpyxl! Pliki Excel mogą nie działać.")
+        print("   -> Zainstaluj wpisując w terminalu: pip install openpyxl")
+        return False
+
+    # 2. Sprawdzanie poprawnej ścieżki i lokalizacji
+    print("\n[2/3] Sprawdzanie lokalizacji uruchomienia...")
+    if not os.path.exists("dist"):
+        print("   ❌ BŁĄD: Brak folderu 'dist'. Uruchamiasz skrypt w złym miejscu!")
+        print("   -> Musisz uruchomić go z głównego folderu 'pgeo-analytics'.")
+        return False
+    print("   ✅ Folder 'dist' znaleziony poprawnie.")
+    
+    # 3. Sprawdzanie czystości i integralności pliku strukturalnego
+    print("\n[3/3] Sprawdzanie czystości pliku strukturalnego (index.html)...")
+    template_path = os.path.join("dist", "index.html")
+    if not os.path.exists(template_path):
+        print("   ❌ BŁĄD: Nie znaleziono głównego silnika aplikacji (dist/index.html)!")
+        return False
+        
+    with open(template_path, 'r', encoding='utf-8') as f:
+        html_content = f.read()
+        
+    if "<!doctype html>" not in html_content.lower() or "<html" not in html_content.lower():
+        print("   ❌ BŁĄD KRYTYCZNY: Twój plik 'dist/index.html' uległ USZKODZENIU!")
+        print("   Prawdopodobnie nadpisał się surowym tekstem w poprzednich próbach.")
+        print("   -> ROZWIĄZANIE: Pobierz repozytorium GitHub ponownie (zrób 'git pull' lub pobierz ZIP)!")
+        return False
+    print("   ✅ Plik 'dist/index.html' jest w pełni zdrowy.")
+    
+    print("\n✅ DIAGNOSTYKA ZAKOŃCZONA POMYŚLNIE. Aplikacja gotowa do pracy.\n")
+    return True
+
+
 def main():
+    if not check_environment():
+        input("Naciśnij Enter, aby zamknąć...")
+        return
+        
     print("=" * 60)
     print(" PGEO ANALYTICS - INIEKTOR BAZY DANYCH (OFFLINE)")
     print("=" * 60)
@@ -20,7 +76,7 @@ def main():
     
     if not os.path.exists(SCIEZKA_DO_PLIKU):
         print(f"❌ BŁĄD: Nie znaleziono pliku pod wskazaną ścieżką!")
-        print("Sprawdź, czy zmieniłeś zmienną SCIEZKA_DO_PLIKU w kodzie tego skryptu.")
+        print("Sprawdź, czy zmieniłeś zmienną SCIEZKA_DO_PLIKU w kodzie rzędzie.")
         input("Naciśnij Enter, aby zamknąć...")
         return
         
@@ -71,26 +127,18 @@ def main():
             html_content = f.read()
             
         print("⏳ Wstrzykiwanie danych (Base64) do silnika przeglądarki...")
-        # Szukamy nagłówka i doklejamy twardą zmienną
-        if "window.__INJECTED_SQL_DATA__" in html_content or "pgeo-data" in html_content:
-            # Usuwamy stare wstrzyknięcie
-            import re
-            html_content = re.sub(r'<script id="pgeo-data">.*?</script>', '', html_content, flags=re.DOTALL)
+        
+        # Usuwamy ewentualne stare wstrzyknięcie
+        import re
+        html_content = re.sub(r'<div id="pgeo-injected-data".*?</div>', '', html_content, flags=re.DOTALL)
+        html_content = re.sub(r'<script id="pgeo-data".*?</script>', '', html_content, flags=re.DOTALL)
             
-        script_tag = f"""
-<script id="pgeo-data">
-  try {{
-      var b64 = "{b64_data}";
-      // Dekodujemy Base64 z powrotem do tekstu (obsługa UTF-8 w przeglądarce)
-      var decodedText = decodeURIComponent(escape(window.atob(b64)));
-      window.__INJECTED_SQL_DATA__ = JSON.parse(decodedText);
-  }} catch(e) {{
-      console.error("Błąd dekodowania bazy danych:", e);
-      window.__INJECTED_SQL_DATA__ = [];
-  }}
-</script>
-</head>"""
-        new_html = html_content.replace("</head>", script_tag)
+        # Zamiast wstrzykiwać luźny skrypt (który na Windowsie przez zabezpieczenia lub dziwne cudzysłowy może zostać sparsowany jako tekst HTML),
+        # wstrzykujemy to strukturalnie jako ukryty element DOM w obrębie <body>.
+        # Jest to najbezpieczniejsza istniejąca metoda przekazywania ogromnych danych do Reacta z pominięciem obostrzeń środowiska wykonawczego.
+        
+        injected_dom_node = f'<div id="pgeo-injected-data" style="display:none;" data-b64="{b64_data}"></div>\n</body>'
+        new_html = html_content.replace("</body>", injected_dom_node)
         
         output_path = os.path.join("dist", "dashboard_z_danymi.html")
         with open(output_path, 'w', encoding='utf-8') as f:
