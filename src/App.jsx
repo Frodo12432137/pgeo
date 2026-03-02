@@ -29,37 +29,40 @@ function App() {
   const [loadingMsg, setLoadingMsg] = useState('');
   const [selectedAnomalyDate, setSelectedAnomalyDate] = useState(null);
 
-  // State for Map (Phase 4)
+  // State for Map (Phase 4) & Fetch Data z lokalnego serwera Pythona
   useEffect(() => {
-    // 1. Sprawdzenie, czy skrypt Python wstrzyknął ukrytego DIVa z Base64 (Najbezpieczniejsza metoda na Windows)
-    const injectedDataNode = document.getElementById('pgeo-injected-data');
-    if (injectedDataNode && injectedDataNode.getAttribute('data-b64')) {
-      setLoadingMsg('Rozpakowywanie wstrzykniętego bloku danych... To zajmie tylko chwilę.');
+    // Odpytujemy pythona po porcie HTTP zamiast szukać bazy w surowym tekście HTML (omija file:// blocki z Windowsa)
+    setLoadingMsg('Nawiązywanie połączenia z lokalnym serwerem analitycznym (Python)...');
 
-      setTimeout(() => {
-        try {
-          const b64Data = injectedDataNode.getAttribute('data-b64');
-          // Dekoduj z Base64 (obsługa UTF-8 na wypadek polskich, dziwnych znaków ze SQL)
-          const decodedText = decodeURIComponent(escape(window.atob(b64Data)));
-          const parsedData = JSON.parse(decodedText);
-
-          if (parsedData.length > 0) {
-            setLoadingMsg('Agregacja tysięcy rekordów Bazy Danych...');
-            setTimeout(() => {
+    fetch('http://localhost:8543/api/data')
+      .then(response => {
+        if (!response.ok) throw new Error('Brak połączenia z Pythonem lub błąd serwera');
+        return response.json();
+      })
+      .then(parsedData => {
+        if (parsedData && parsedData.length > 0) {
+          setLoadingMsg('Agregacja tysięcy rekordów Bazy Danych...');
+          setTimeout(() => {
+            try {
               const processedDb = processRawSQLData(parsedData);
               setData(processedDb);
               setLocations(getAvailableLocations(processedDb));
               setLoadingMsg('');
-            }, 50);
-          } else {
-            setLoadingMsg('');
-          }
-        } catch (err) {
-          alert('Krytyczny błąd podczas dekodowania Bazy: ' + err.message);
+            } catch (err) {
+              alert('Krytyczny błąd podczas agregacji matematycznej Bazy w React: ' + err.message);
+              setLoadingMsg('');
+            }
+          }, 50);
+        } else {
           setLoadingMsg('');
         }
-      }, 50);
-    }
+      })
+      .catch(err => {
+        // Zwykły catch. Może oznaczać, że user nie uruchomił Pythona
+        console.log('Połączenie API nieaktywne: ', err.message);
+        setLoadingMsg('');
+      });
+
   }, []);
 
   const [isDragging, setIsDragging] = useState(false);
