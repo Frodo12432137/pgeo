@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
+import Papa from 'papaparse';
 import { generateMockData } from './data/mockData';
-import { filterData, getAvailableLocations, getAggregatedMetrics } from './utils/dataProcessing';
+import { filterData, getAvailableLocations, getAggregatedMetrics, processRawSQLData } from './utils/dataProcessing';
 
 import Controls from './components/Controls';
 import MetricsCards from './components/MetricsCards';
@@ -29,12 +30,64 @@ function App() {
   // State for Map (Phase 4)
   const [selectedAnomalyDate, setSelectedAnomalyDate] = useState(null);
 
-  useEffect(() => {
-    // Symulacja ładowania danych
-    const mockDb = generateMockData();
-    setData(mockDb);
-    setLocations(getAvailableLocations(mockDb));
-  }, []);
+  const [isDragging, setIsDragging] = useState(false);
+  const [loadingMsg, setLoadingMsg] = useState('');
+
+  // Sposób na szybkie testy bez własnych danych
+  const loadMockData = () => {
+    setLoadingMsg('Generowanie i analizowanie danych modelu...');
+    setTimeout(() => {
+      const mockDb = generateMockData();
+      setData(mockDb);
+      setLocations(getAvailableLocations(mockDb));
+      setLoadingMsg('');
+    }, 100);
+  };
+
+  // Ładowanie prawdziwych danych z pliku Excel/CSV
+  const handleFileUpload = (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setLoadingMsg('Parsowanie pliku z bazy danych (CSV)...');
+
+    Papa.parse(file, {
+      header: true,
+      dynamicTyping: true, // automatycznie zamienia stringi na liczby gdzie to możliwe
+      skipEmptyLines: true,
+      complete: function (results) {
+        setLoadingMsg('Przeliczanie modelu i składanie wskaźników HRES...');
+        // processRawSQLData to ówcześniej napisana funkcja łącząca surowe wiersze
+        setTimeout(() => {
+          const processedDb = processRawSQLData(results.data);
+          setData(processedDb);
+          setLocations(getAvailableLocations(processedDb));
+          setLoadingMsg('');
+        }, 100);
+      },
+      error: function (err) {
+        alert("Błąd podczas odczytu pliku: " + err.message);
+        setLoadingMsg('');
+      }
+    });
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = () => {
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    setIsDragging(false);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      handleFileUpload({ target: { files: [e.dataTransfer.files[0]] } });
+    }
+  };
 
   // Filtered data to pass down
   const filteredData = useMemo(() => {
@@ -59,8 +112,51 @@ function App() {
 
       <main className="main-content">
         {data.length === 0 ? (
-          <div className="flex items-center justify-center h-full text-secondary">
-            <p>Generowanie i analizowanie danych modelu...</p>
+          <div className="flex flex-col items-center justify-center h-[70vh]">
+            <div
+              className={`glass-panel p-12 text-center max-w-2xl w-full border-2 border-dashed transition-all duration-300 ${isDragging ? 'border-accent bg-accent/5' : 'border-[var(--border-glass)] hover:border-accent/50'}`}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+            >
+
+              {loadingMsg ? (
+                <>
+                  <div className="w-16 h-16 border-4 border-t-accent border-r-accent border-b-white/10 border-l-white/10 rounded-full animate-spin mx-auto mb-6"></div>
+                  <h2 className="text-2xl font-bold text-primary mb-2">Ładowanie</h2>
+                  <p className="text-secondary">{loadingMsg}</p>
+                </>
+              ) : (
+                <>
+                  <div className="w-20 h-20 bg-blue-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--color-brand)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+                      <polyline points="14 2 14 8 20 8" />
+                      <path d="M12 18v-6" />
+                      <path d="M9 15l3-3 3 3" />
+                    </svg>
+                  </div>
+                  <h2 className="text-3xl font-bold text-primary mb-4">Wczytaj dane z bazy (CSV)</h2>
+                  <p className="text-secondary mb-8 text-lg">Przeciągnij i upuść plik z surowym zrzutem tabeli PGEO (format .csv z przecinkami) prosto z SSMS, aby przeanalizować model offline.</p>
+
+                  <div className="flex gap-4 justify-center">
+                    <label className="cursor-pointer bg-gradient-brand text-white font-medium px-6 py-3 rounded-lg hover:shadow-xl hover:shadow-blue-500/20 transition-all flex items-center gap-2">
+                      + Wybierz plik z komputera
+                      <input type="file" accept=".csv" className="hidden" onChange={handleFileUpload} />
+                    </label>
+                    <button
+                      onClick={loadMockData}
+                      className="px-6 py-3 rounded-lg border border-[var(--border-glass)] text-secondary hover:text-white hover:bg-white/5 transition-all font-medium"
+                    >
+                      Lub załaduj dane testowe
+                    </button>
+                  </div>
+                  <p className="text-xs text-muted mt-6 text-center opacity-70">
+                    Aplikacja analizuje setki tysięcy rekordów na żywo. Operacja odbywa się w pełni bezpiecznie wewnątrz Twojej przeglądarki, dane nie opuszczają sieci w lokalnym obiegu.
+                  </p>
+                </>
+              )}
+            </div>
           </div>
         ) : (
           <div className="dashboard-grid">

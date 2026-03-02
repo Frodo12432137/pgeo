@@ -383,3 +383,91 @@ export const getHistoryComparison = (allData, currentFilteredData) => {
         }
     ];
 };
+
+// Funkcja "Furtka" - Przetwarzająca surowe dane z excela / CSV
+export const processRawSQLData = (rawData) => {
+    // rawData to tablica obiektów wypluta z PapaParse np: [{ dataGodzinaUTC: "2026-01-01 12:00:00.000", lokalizacja: "PGED_Bialystok", Val_Historia: 12.5 ... }]
+    const processed = [];
+
+    // Najpierw musimy wyliczyć MAE dla wszystkich lokalizacji i MAPE dobowe
+    // Krok 1: Grupujemy po dniu i lokalizacji dla MApe Dobowe
+    const dailyMapeData = {};
+    const locMaeData = {};
+
+    rawData.forEach(row => {
+        if (!row.lokalizacja || !row.dataGodzinaUTC) return; // Pomijamy puste wiersze
+
+        const loc = row.lokalizacja;
+        const day = row.dataGodzinaUTC.substring(0, 10);
+        const keyDayLoc = `${loc}_${day}`;
+
+        // Bezpieczne parsowanie liczbowe
+        const vHist = Number(row.Val_Historia) || 0;
+        const vHres = Number(row.Val_HRES) || 0;
+        const vKor = Number(row.Val_Korekta) || 0;
+
+        // Zapewnienie błędu absolutnego (często SQL go oddaje, ale wyliczmy dla pewności)
+        const errAbsHres = Number(row.Blad_Abs_HRES) || Math.abs(vHres - vHist);
+        const errAbsKor = Number(row.Blad_Abs_Korekta) || Math.abs(vKor - vHist);
+
+        // Agregacja lokalizacyjna (MAE)
+        if (!locMaeData[loc]) {
+            locMaeData[loc] = { sumHres: 0, sumKor: 0, count: 0 };
+        }
+        locMaeData[loc].sumHres += errAbsHres;
+        locMaeData[loc].sumKor += errAbsKor;
+        locMaeData[loc].count += 1;
+
+        // Agregacja dobowa (MAPE)
+        if (!dailyMapeData[keyDayLoc]) {
+            dailyMapeData[keyDayLoc] = { sumMapeHres: 0, sumMapeKor: 0, validHours: 0 };
+        }
+
+        if (vHist > 0.1) {
+            dailyMapeData[keyDayLoc].sumMapeHres += (errAbsHres / Math.abs(vHist));
+            dailyMapeData[keyDayLoc].sumMapeKor += (errAbsKor / Math.abs(vHist));
+            dailyMapeData[keyDayLoc].validHours += 1;
+        }
+
+        processed.push({
+            dataGodzinaUTC: row.dataGodzinaUTC,
+            lokalizacja: row.lokalizacja,
+            Val_Historia: vHist,
+            Val_HRES: vHres,
+            Val_Korekta: vKor,
+            Blad_Abs_HRES: errAbsHres,
+            Blad_Abs_Korekta: errAbsKor,
+            cps: Number(row.cps) || 0,
+            cps_cn: Number(row.cps_cn) || 0,
+            temp: row.temp !== null && row.temp !== '' ? Number(row.temp) : null,
+            zachmurzenie: row.zachmurzenie !== null && row.zachmurzenie !== '' ? Number(row.zachmurzenie) : null,
+            opady_pow_all: Number(row.opady_pow_all) || 0,
+            w_sniegu: Number(row.w_sniegu) || 0
+        });
+    });
+
+    // Krok 2: Uzupełnianie atrybutów wyliczonych na każdy wiersz
+    processed.forEach(row => {
+        const keyDayLoc = `${row.lokalizacja}_${row.dataGodzinaUTC.substring(0, 10)}`;
+        const dailyInfo = dailyMapeData[keyDayLoc];
+        const locInfo = locMaeData[row.lokalizacja];
+
+        row.MAPE_HRES_Doba = dailyInfo && dailyInfo.validHours > 0
+            ? Number((dailyInfo.sumMapeHres / dailyInfo.validHours).toFixed(4))
+            : 0;
+
+        row.MAPE_Korekta_Doba = dailyInfo && dailyInfo.validHours > 0
+            ? Number((dailyInfo.sumMapeKor / dailyInfo.validHours).toFixed(4))
+            : 0;
+
+        row.MAE_HRES = locInfo && locInfo.count > 0
+            ? Number((locInfo.sumHres / locInfo.count).toFixed(2))
+            : 0;
+
+        row.MAE_Korekta = locInfo && locInfo.count > 0
+            ? Number((locInfo.sumKor / locInfo.count).toFixed(2))
+            : 0;
+    });
+
+    return processed;
+};
