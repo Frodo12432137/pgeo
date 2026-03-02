@@ -2,6 +2,7 @@ import pandas as pd
 import json
 import os
 import webbrowser
+import base64
 
 # ==============================================================================
 # ⬇️ TUTAJ WKLEJ ŚCIEŻKĘ DO SWOJEGO PLIKU Z BAZY SSMS (EXCEL .xlsx LUB .csv) ⬇️
@@ -55,6 +56,9 @@ def main():
         records = df.to_dict(orient='records')
         json_data = json.dumps(records)
         
+        # Enkodowanie w Base64 aby zapobiec psuciu HTML przez znaki w stylu </script> w surowych danych
+        b64_data = base64.b64encode(json_data.encode('utf-8')).decode('utf-8')
+        
         # 3. WSTRZYKIWANIE DANYCH DO APLIKACJI
         template_path = os.path.join("dist", "index.html")
         if not os.path.exists(template_path):
@@ -66,15 +70,26 @@ def main():
         with open(template_path, 'r', encoding='utf-8') as f:
             html_content = f.read()
             
-        print("⏳ Wstrzykiwanie danych do silnika przeglądarki...")
-        # Szukamy nagłówka i doklejamy twardą zmienną window.__INJECTED_SQL_DATA__
-        # Zabezpieczenie przed podwójnym wstrzyknięciem:
-        if "window.__INJECTED_SQL_DATA__" in html_content:
+        print("⏳ Wstrzykiwanie danych (Base64) do silnika przeglądarki...")
+        # Szukamy nagłówka i doklejamy twardą zmienną
+        if "window.__INJECTED_SQL_DATA__" in html_content or "pgeo-data" in html_content:
             # Usuwamy stare wstrzyknięcie
             import re
             html_content = re.sub(r'<script id="pgeo-data">.*?</script>', '', html_content, flags=re.DOTALL)
             
-        script_tag = f'\n<script id="pgeo-data">window.__INJECTED_SQL_DATA__ = {json_data};</script>\n</head>'
+        script_tag = f"""
+<script id="pgeo-data">
+  try {{
+      var b64 = "{b64_data}";
+      // Dekodujemy Base64 z powrotem do tekstu (obsługa UTF-8 w przeglądarce)
+      var decodedText = decodeURIComponent(escape(window.atob(b64)));
+      window.__INJECTED_SQL_DATA__ = JSON.parse(decodedText);
+  }} catch(e) {{
+      console.error("Błąd dekodowania bazy danych:", e);
+      window.__INJECTED_SQL_DATA__ = [];
+  }}
+</script>
+</head>"""
         new_html = html_content.replace("</head>", script_tag)
         
         output_path = os.path.join("dist", "dashboard_z_danymi.html")
