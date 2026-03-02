@@ -395,10 +395,26 @@ export const processRawSQLData = (rawData) => {
     const locMaeData = {};
 
     rawData.forEach(row => {
-        if (!row.lokalizacja || !row.dataGodzinaUTC) return; // Pomijamy puste wiersze
+        // Normalizacja daty (Excel często oddaje liczby seryjne zamiast stringów)
+        let rawDate = row.dataGodzinaUTC || row.DataGodzinaUTC || row.DataGodzina || row.data || row.Date;
+        if (!row.lokalizacja || !rawDate) return;
 
-        const loc = row.lokalizacja;
-        const day = row.dataGodzinaUTC.substring(0, 10);
+        // Konwersja liczby seryjnej Excela do formatu JS Date (System 1900)
+        if (typeof rawDate === 'number') {
+            const excelEpoch = new Date(Date.UTC(1899, 11, 30));
+            rawDate = new Date(excelEpoch.getTime() + rawDate * 86400000).toISOString().replace('T', ' ').replace('Z', '.000');
+        } else if (typeof rawDate === 'string' && !rawDate.includes('-')) {
+            // Zapas dla dziwnych formatów tekstowych DD.MM.YYYY
+            // Bardzo prosty fallback - nadpiszemy go z oryginalnym, aby wymusić string
+            rawDate = rawDate.toString();
+        }
+
+        const loc = String(row.lokalizacja);
+        // Ochrona przed uszkodzonym / za krotkim stringiem daty
+        const parsedDateStr = String(rawDate);
+        if (parsedDateStr.length < 10) return;
+
+        const day = parsedDateStr.substring(0, 10);
         const keyDayLoc = `${loc}_${day}`;
 
         // Bezpieczne parsowanie liczbowe
@@ -430,8 +446,8 @@ export const processRawSQLData = (rawData) => {
         }
 
         processed.push({
-            dataGodzinaUTC: row.dataGodzinaUTC,
-            lokalizacja: row.lokalizacja,
+            dataGodzinaUTC: parsedDateStr,
+            lokalizacja: loc,
             Val_Historia: vHist,
             Val_HRES: vHres,
             Val_Korekta: vKor,
@@ -448,6 +464,8 @@ export const processRawSQLData = (rawData) => {
 
     // Krok 2: Uzupełnianie atrybutów wyliczonych na każdy wiersz
     processed.forEach(row => {
+        if (!row.dataGodzinaUTC || row.dataGodzinaUTC.length < 10) return;
+
         const keyDayLoc = `${row.lokalizacja}_${row.dataGodzinaUTC.substring(0, 10)}`;
         const dailyInfo = dailyMapeData[keyDayLoc];
         const locInfo = locMaeData[row.lokalizacja];

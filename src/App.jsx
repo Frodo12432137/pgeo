@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import Papa from 'papaparse';
+import * as XLSX from 'xlsx';
 import { generateMockData } from './data/mockData';
 import { filterData, getAvailableLocations, getAggregatedMetrics, processRawSQLData } from './utils/dataProcessing';
 
@@ -45,31 +45,55 @@ function App() {
   };
 
   // Ładowanie prawdziwych danych z pliku Excel/CSV
-  const handleFileUpload = (event) => {
+  const handleFileUpload = async (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    setLoadingMsg('Parsowanie pliku z bazy danych (CSV)...');
+    setLoadingMsg(`Wczytywanie pliku ${file.name}... Proszę cierpliwie czekać (może zająć do ok. 10 sekund)`);
 
-    Papa.parse(file, {
-      header: true,
-      dynamicTyping: true, // automatycznie zamienia stringi na liczby gdzie to możliwe
-      skipEmptyLines: true,
-      complete: function (results) {
-        setLoadingMsg('Przeliczanie modelu i składanie wskaźników HRES...');
-        // processRawSQLData to ówcześniej napisana funkcja łącząca surowe wiersze
-        setTimeout(() => {
-          const processedDb = processRawSQLData(results.data);
-          setData(processedDb);
-          setLocations(getAvailableLocations(processedDb));
+    try {
+      // FileReader jest asynchroniczny, wczytujemy plik jako ArrayBuffer żeby go podać do XLSX
+      const data = await file.arrayBuffer();
+
+      // Zmuszamy UI do odświeżenia przez setTimeout 0, bo duży Excel zawiesza na moment główny wątek JS
+      setTimeout(() => {
+        try {
+          // Wczytanie skoroszytu Excela
+          const workbook = XLSX.read(data, { type: 'array' });
+          const firstSheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[firstSheetName];
+
+          setLoadingMsg('Wyciąganie tabel SQL i kompresja danych...');
+
+          // Konwersja tabeli Excela na czystą tablicę obiektów z nagłówkami
+          const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: null });
+
+          if (jsonData.length === 0) {
+            alert("Plik Excel jest pusty.");
+            setLoadingMsg('');
+            return;
+          }
+
+          setLoadingMsg('Składanie wskaźników HRES dla tysięcy rekordów (MAPE, MAE)...');
+
+          // Odsunięcie w czasie samego przetworzenia, by pasek Loading mógł się narysować na froncie.
+          setTimeout(() => {
+            const processedDb = processRawSQLData(jsonData);
+            setData(processedDb);
+            setLocations(getAvailableLocations(processedDb));
+            setLoadingMsg('');
+          }, 100);
+
+        } catch (err) {
+          alert('Wystąpił błąd podczas dekodowania Excela: ' + err.message);
           setLoadingMsg('');
-        }, 100);
-      },
-      error: function (err) {
-        alert("Błąd podczas odczytu pliku: " + err.message);
-        setLoadingMsg('');
-      }
-    });
+        }
+      }, 50);
+
+    } catch (error) {
+      alert("Nie udało się otworzyć tego pliku: " + error.message);
+      setLoadingMsg('');
+    }
   };
 
   const handleDragOver = (e) => {
@@ -136,13 +160,13 @@ function App() {
                       <path d="M9 15l3-3 3 3" />
                     </svg>
                   </div>
-                  <h2 className="text-3xl font-bold text-primary mb-4">Wczytaj dane z bazy (CSV)</h2>
-                  <p className="text-secondary mb-8 text-lg">Przeciągnij i upuść plik z surowym zrzutem tabeli PGEO (format .csv z przecinkami) prosto z SSMS, aby przeanalizować model offline.</p>
+                  <h2 className="text-3xl font-bold text-primary mb-4">Wczytaj dane z bazy (Excel)</h2>
+                  <p className="text-secondary mb-8 text-lg">Przeciągnij i upuść plik ze zrzutem tabeli PGEO (zwykły <strong>.xlsx</strong> lub .csv) uratowany z SSMS, aby przeanalizować model offline.</p>
 
                   <div className="flex gap-4 justify-center">
                     <label className="cursor-pointer bg-gradient-brand text-white font-medium px-6 py-3 rounded-lg hover:shadow-xl hover:shadow-blue-500/20 transition-all flex items-center gap-2">
                       + Wybierz plik z komputera
-                      <input type="file" accept=".csv" className="hidden" onChange={handleFileUpload} />
+                      <input type="file" accept=".xlsx, .xls, .csv" className="hidden" onChange={handleFileUpload} />
                     </label>
                     <button
                       onClick={loadMockData}
