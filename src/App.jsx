@@ -28,6 +28,7 @@ function App() {
   const [endDate, setEndDate] = useState('2026-01-30');
   const [loadingMsg, setLoadingMsg] = useState('');
   const [selectedAnomalyDate, setSelectedAnomalyDate] = useState(null);
+  const [apiError, setApiError] = useState(null);
 
   // State for Map (Phase 4) & Fetch Data z lokalnego serwera Pythona
   useEffect(() => {
@@ -58,8 +59,9 @@ function App() {
         }
       })
       .catch(err => {
-        // Zwykły catch. Może oznaczać, że user nie uruchomił Pythona
+        // Obserwacja na ekranie czy zapytanie ginie ze strony Chrome'a (ERR_CONNECTION_REFUSED) czy rzuca błędem
         console.log('Połączenie API nieaktywne: ', err.message);
+        setApiError(err.message);
         setLoadingMsg('');
       });
 
@@ -196,6 +198,21 @@ function App() {
                   </div>
                   <h2 className="text-3xl font-bold text-primary mb-4">Dashboard czeka na serwer analityczny...</h2>
                   <p className="text-secondary mb-8 text-lg">Aby wczytać dane do systemu omijając limit pamięci Chrome i Windows CORS, <strong>uruchom w tle skrypt Python: uruchom_aplikacje.py</strong> i nie zamykaj go tak długo, jak używasz Dashboardu.</p>
+
+                  {apiError && (
+                    <div className="mb-8 p-4 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-left max-w-lg mx-auto">
+                      <h3 className="font-bold flex items-center gap-2 mb-2">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <circle cx="12" cy="12" r="10"></circle>
+                          <line x1="12" y1="8" x2="12" y2="12"></line>
+                          <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                        </svg>
+                        Brak Połączenia z Serwerem
+                      </h3>
+                      <p className="text-sm">Otrzymaliśmy błąd: <strong>{apiError}</strong>.</p>
+                      <p className="text-sm mt-2 opacity-80">Oznacza to, że program <code>uruchom_aplikacje.py</code> prawdopodobnie NIE DZIAŁA w tle Twojego komputera, albo analityka blokuje port 8543.</p>
+                    </div>
+                  )}
 
                   <div className="flex gap-4 justify-center">
                     <button
