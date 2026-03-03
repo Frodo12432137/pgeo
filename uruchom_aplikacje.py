@@ -12,7 +12,7 @@ import time
 # ⬇️ TUTAJ WKLEJ ŚCIEŻKĘ DO SWOJEGO PLIKU Z BAZY SSMS (EXCEL .xlsx LUB .csv) ⬇️
 # ==============================================================================
 
-SCIEZKA_DO_PLIKU = r"C:\Twoj\Folder\dane_pgeo.xlsx"
+SCIEZKA_DO_PLIKU = "mock_data.xlsx"
 PORT = 8543
 
 # Zmienna przechowująca przetworzone dane w pamięci (aby nie czytać pliku przy każdym requeście)

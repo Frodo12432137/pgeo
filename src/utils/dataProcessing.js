@@ -396,35 +396,46 @@ export const processRawSQLData = (rawData) => {
 
     rawData.forEach(row => {
         // Normalizacja daty (Excel często oddaje liczby seryjne zamiast stringów)
-        let rawDate = row.dataGodzinaUTC || row.DataGodzinaUTC || row.DataGodzina || row.data || row.Date;
-        if (!row.lokalizacja || !rawDate) return;
+        let rawDate = row.dataGodzinaUTC || row.DataGodzinaUTC || row.DataGodzina || row.data || row.Date || row.data_godzina_utc;
+        let loc = row.lokalizacja || row.Lokalizacja;
+
+        if (!loc || !rawDate) return;
 
         // Konwersja liczby seryjnej Excela do formatu JS Date (System 1900)
         if (typeof rawDate === 'number') {
             const excelEpoch = new Date(Date.UTC(1899, 11, 30));
             rawDate = new Date(excelEpoch.getTime() + rawDate * 86400000).toISOString().replace('T', ' ').replace('Z', '.000');
-        } else if (typeof rawDate === 'string' && !rawDate.includes('-')) {
-            // Zapas dla dziwnych formatów tekstowych DD.MM.YYYY
-            // Bardzo prosty fallback - nadpiszemy go z oryginalnym, aby wymusić string
-            rawDate = rawDate.toString();
         }
 
-        const loc = String(row.lokalizacja);
-        // Ochrona przed uszkodzonym / za krotkim stringiem daty
-        const parsedDateStr = String(rawDate);
-        if (parsedDateStr.length < 10) return;
+        // Bezpieczne wymuszenie na String
+        const parsedDateStr = String(rawDate).trim();
+        if (parsedDateStr.length < 10) return; // Omit corrupted dates gracefully
 
+        loc = String(loc).trim();
         const day = parsedDateStr.substring(0, 10);
         const keyDayLoc = `${loc}_${day}`;
 
+        // Normalize keys (Pandas from HTTP API uppercase/lowercase mismatch protection)
+        const rowKeys = Object.keys(row);
+        let vHistVal = 0, vHresVal = 0, vKorVal = 0, errAbsHresVal = null, errAbsKorVal = null;
+
+        rowKeys.forEach(k => {
+            const kl = k.toLowerCase();
+            if (kl === 'val_historia') vHistVal = Number(row[k]) || 0;
+            else if (kl === 'val_hres') vHresVal = Number(row[k]) || 0;
+            else if (kl === 'val_korekta') vKorVal = Number(row[k]) || 0;
+            else if (kl === 'blad_abs_hres') errAbsHresVal = Number(row[k]);
+            else if (kl === 'blad_abs_korekta') errAbsKorVal = Number(row[k]);
+        });
+
         // Bezpieczne parsowanie liczbowe
-        const vHist = Number(row.Val_Historia) || 0;
-        const vHres = Number(row.Val_HRES) || 0;
-        const vKor = Number(row.Val_Korekta) || 0;
+        const vHist = vHistVal;
+        const vHres = vHresVal;
+        const vKor = vKorVal;
 
         // Zapewnienie błędu absolutnego (często SQL go oddaje, ale wyliczmy dla pewności)
-        const errAbsHres = Number(row.Blad_Abs_HRES) || Math.abs(vHres - vHist);
-        const errAbsKor = Number(row.Blad_Abs_Korekta) || Math.abs(vKor - vHist);
+        const errAbsHres = errAbsHresVal !== null ? errAbsHresVal : Math.abs(vHres - vHist);
+        const errAbsKor = errAbsKorVal !== null ? errAbsKorVal : Math.abs(vKor - vHist);
 
         // Agregacja lokalizacyjna (MAE)
         if (!locMaeData[loc]) {
