@@ -35,16 +35,18 @@ def load_data():
     print(f"✅ Wczytano pomyślnie {len(df)} rekordów z bazy!")
     print("⏳ Optymalizowanie i czyszczenie formatów daty...")
     
-    df = df.where(pd.notnull(df), None)
-    
     time_cols = ['dataGodzinaUTC', 'DataGodzinaUTC', 'DataGodzina', 'data', 'Date']
     for col in time_cols:
         if col in df.columns:
             df[col] = df[col].astype(str)
             break
             
-    records = df.to_dict(orient='records')
-    PRZETWORZONE_DANE = json.dumps(records).encode('utf-8')
+    # KLUCZOWE NA TYM ETAPIE: 
+    # Pythonowy moduł json() formatuje np.nan jako nieliteralny napis NaN, gwałcąc standardy Javascript,
+    # co powodowało Unexcepted Token 'N' podczas parsowania bazy przez Reacta.
+    # Wbudowany w pandas export JSON obsługuje poprawną wymianę brakujących liczb na "null"
+    json_str = df.to_json(orient='records', date_format='iso')
+    PRZETWORZONE_DANE = json_str.encode('utf-8')
     print("✅ Dane gotowe do wysłania do przeglądarki!")
 
 
