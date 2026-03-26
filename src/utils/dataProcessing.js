@@ -31,8 +31,8 @@ export const getAggregatedMetrics = (filteredData) => {
     let sumMapeHres = 0;
 
     filteredData.forEach(row => {
-        sumMaeKorekta += row.Blad_Abs_Korekta;
-        sumMaeHres += row.Blad_Abs_HRES;
+        sumMaeKorekta += (row.Val_Korekta - row.Val_Historia);
+        sumMaeHres += (row.Val_HRES - row.Val_Historia);
     });
 
     const avgMaeKorekta = sumMaeKorekta / filteredData.length;
@@ -41,7 +41,7 @@ export const getAggregatedMetrics = (filteredData) => {
     return {
         maeKorekta: avgMaeKorekta.toFixed(2),
         maeHres: avgMaeHres.toFixed(2),
-        betterModel: avgMaeKorekta < avgMaeHres ? 'Korekta' : 'HRES'
+        betterModel: Math.abs(avgMaeKorekta) < Math.abs(avgMaeHres) ? 'Korekta' : 'HRES'
     };
 };
 

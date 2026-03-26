@@ -7,11 +7,11 @@ import Controls from './components/Controls';
 import MetricsCards from './components/MetricsCards';
 import ErrorDistributionPanel from './components/ErrorDistributionPanel';
 import HourlyErrorsChart from './components/HourlyErrorsChart';
+import HourlyValuesChart from './components/HourlyValuesChart';
 import WeatherImpactPanel from './components/WeatherImpactPanel';
 import WeatherKPIs from './components/WeatherKPIs';
 import TemperatureImpactChart from './components/TemperatureImpactChart';
 import SnowRainImpactChart from './components/SnowRainImpactChart';
-import RelativeErrorsPanel from './components/RelativeErrorsPanel';
 import CorrelationPanel from './components/CorrelationPanel';
 import HistoryComparisonPanel from './components/HistoryComparisonPanel';
 import WorstAnomaliesTable from './components/WorstAnomaliesTable';
@@ -241,7 +241,6 @@ function App() {
               </h2>
             </div>
 
-            <RelativeErrorsPanel data={filteredData} />
             <HistoryComparisonPanel allData={data} currentFilteredData={filteredData} />
 
 
@@ -261,6 +260,9 @@ function App() {
 
             {/* Wykres godzinowy */}
             <HourlyErrorsChart data={filteredData} />
+
+            {/* Wykres godzinowy (wartości) */}
+            <HourlyValuesChart data={filteredData} />
 
             {/* --- SEKCJA POGODOWA (FOCUS HRES) --- */}
             <div className="col-span-12 mt-8 mb-2">

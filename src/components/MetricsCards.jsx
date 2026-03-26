@@ -40,7 +40,7 @@ const MetricsCards = ({ metrics }) => {
                         {metrics.betterModel}
                     </span>
                     <p className="text-sm text-secondary mt-1">
-                        Lepszy o <span className="font-bold text-primary">{diff} MW</span> (MAE)
+                        Lepszy o <span className="font-bold text-primary">{diff} MW</span> (Średnio)
                     </p>
                 </div>
             </div>
