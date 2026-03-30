@@ -25,23 +25,41 @@ export const getAvailableLocations = (data) => {
 export const getAggregatedMetrics = (filteredData) => {
     if (!filteredData || filteredData.length === 0) return null;
 
-    let sumMaeKorekta = 0;
-    let sumMaeHres = 0;
-    let sumMapeKorekta = 0;
-    let sumMapeHres = 0;
+    // 1. Agregacja (Total) per godzina (pozwala na wzajemne znoszenie się błędów między lokalizacjami)
+    const hourlyTotals = {};
 
     filteredData.forEach(row => {
-        sumMaeKorekta += (row.Val_Korekta - row.Val_Historia);
-        sumMaeHres += (row.Val_HRES - row.Val_Historia);
+        const time = row.dataGodzinaUTC;
+        if (!hourlyTotals[time]) {
+            hourlyTotals[time] = {
+                Val_Korekta: 0,
+                Val_HRES: 0,
+                Val_Historia: 0
+            };
+        }
+        hourlyTotals[time].Val_Korekta += row.Val_Korekta;
+        hourlyTotals[time].Val_HRES += row.Val_HRES;
+        hourlyTotals[time].Val_Historia += row.Val_Historia;
     });
 
-    const avgMaeKorekta = sumMaeKorekta / filteredData.length;
-    const avgMaeHres = sumMaeHres / filteredData.length;
+    let sumErrorKorekta = 0;
+    let sumErrorHres = 0;
+    let numHours = 0;
+
+    // 2. Obliczenie odchylenia absolutnego na poziomie "Totalu" całego portfela
+    Object.values(hourlyTotals).forEach(totals => {
+        sumErrorKorekta += Math.abs(totals.Val_Korekta - totals.Val_Historia);
+        sumErrorHres += Math.abs(totals.Val_HRES - totals.Val_Historia);
+        numHours++;
+    });
+
+    const avgMaeKorekta = numHours > 0 ? sumErrorKorekta / numHours : 0;
+    const avgMaeHres = numHours > 0 ? sumErrorHres / numHours : 0;
 
     return {
         maeKorekta: avgMaeKorekta.toFixed(2),
         maeHres: avgMaeHres.toFixed(2),
-        betterModel: Math.abs(avgMaeKorekta) < Math.abs(avgMaeHres) ? 'Korekta' : 'HRES'
+        betterModel: avgMaeKorekta < avgMaeHres ? 'Korekta' : 'HRES'
     };
 };
 
