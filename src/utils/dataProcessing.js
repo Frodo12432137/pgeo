@@ -44,22 +44,27 @@ export const getAggregatedMetrics = (filteredData) => {
 
     let sumErrorKorekta = 0;
     let sumErrorHres = 0;
-    let numHours = 0;
+    let numProductionHours = 0;
 
     // 2. Obliczenie odchylenia absolutnego na poziomie "Totalu" całego portfela
+    // UWAGA: Liczymy średnią TYLKO dla godzin, w których występuje produkcja (> 0.1 MW), 
+    // aby błąd nie był sztucznie zaniżany przez noce (Daylight MAE).
     Object.values(hourlyTotals).forEach(totals => {
-        sumErrorKorekta += Math.abs(totals.Val_Korekta - totals.Val_Historia);
-        sumErrorHres += Math.abs(totals.Val_HRES - totals.Val_Historia);
-        numHours++;
+        if (totals.Val_Historia > 0.1) {
+            sumErrorKorekta += Math.abs(totals.Val_Korekta - totals.Val_Historia);
+            sumErrorHres += Math.abs(totals.Val_HRES - totals.Val_Historia);
+            numProductionHours++;
+        }
     });
 
-    const avgMaeKorekta = numHours > 0 ? sumErrorKorekta / numHours : 0;
-    const avgMaeHres = numHours > 0 ? sumErrorHres / numHours : 0;
+    const avgMaeKorekta = numProductionHours > 0 ? sumErrorKorekta / numProductionHours : 0;
+    const avgMaeHres = numProductionHours > 0 ? sumErrorHres / numProductionHours : 0;
 
     return {
         maeKorekta: avgMaeKorekta.toFixed(2),
         maeHres: avgMaeHres.toFixed(2),
-        betterModel: avgMaeKorekta < avgMaeHres ? 'Korekta' : 'HRES'
+        betterModel: avgMaeKorekta < avgMaeHres ? 'Korekta' : 'HRES',
+        numProductionHours
     };
 };
 
