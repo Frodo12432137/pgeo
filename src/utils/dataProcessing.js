@@ -25,36 +25,17 @@ export const getAvailableLocations = (data) => {
 export const getAggregatedMetrics = (filteredData) => {
     if (!filteredData || filteredData.length === 0) return null;
 
-    // 1. Agregacja absolutnych błędów per godzina (suma abs błędów każdej lokalizacji osobno)
-    // WAŻNE: NIE sumujemy wartości prognoz przed Math.abs(), bo wtedy błędy +/- znoszą się
-    // nawzajem między farmami i MAE wychodzi sztucznie zaniżone.
-    // Zamiast tego: dla każdej godziny sumujemy |błąd| każdej lokalizacji → realne portfolio MAE.
-    const hourlyAbsErrors = {};
-
-    filteredData.forEach(row => {
-        const time = row.dataGodzinaUTC;
-        if (!hourlyAbsErrors[time]) {
-            hourlyAbsErrors[time] = {
-                sumAbsKorekta: 0,
-                sumAbsHres: 0,
-                totalHistoria: 0
-            };
-        }
-        hourlyAbsErrors[time].sumAbsKorekta += Math.abs(row.Val_Korekta - row.Val_Historia);
-        hourlyAbsErrors[time].sumAbsHres += Math.abs(row.Val_HRES - row.Val_Historia);
-        hourlyAbsErrors[time].totalHistoria += row.Val_Historia;
-    });
-
+    // Prosta kalkulacja MAE: per wiersz (per farma per godzina)
+    // Brak agregacji portfolio — brak efektu znoszenia błędów między farmami.
+    // Tylko godziny dzienne (Val_Historia > 0.1 MW), aby nie zawyżać liczby godzin nocami.
     let sumErrorKorekta = 0;
     let sumErrorHres = 0;
     let numProductionHours = 0;
 
-    // 2. Uśredniamy po godzinach, w których całe portfolio miało produkcję (> 0.1 MW)
-    // Daylight MAE — wyklucza noce, gdzie błąd byłby bliski zeru i zaniżał wynik.
-    Object.values(hourlyAbsErrors).forEach(h => {
-        if (h.totalHistoria > 0.1) {
-            sumErrorKorekta += h.sumAbsKorekta;
-            sumErrorHres += h.sumAbsHres;
+    filteredData.forEach(row => {
+        if (row.Val_Historia > 0.1) {
+            sumErrorKorekta += Math.abs(row.Val_Korekta - row.Val_Historia);
+            sumErrorHres += Math.abs(row.Val_HRES - row.Val_Historia);
             numProductionHours++;
         }
     });
