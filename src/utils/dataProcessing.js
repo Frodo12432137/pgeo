@@ -439,9 +439,9 @@ export const processRawSQLData = (rawData) => {
         const vHres = vHresVal;
         const vKor = vKorVal;
 
-        // Zapewnienie błędu absolutnego (często SQL go oddaje, ale wyliczmy dla pewności)
-        const errAbsHres = errAbsHresVal !== null ? errAbsHresVal : Math.abs(vHres - vHist);
-        const errAbsKor = errAbsKorVal !== null ? errAbsKorVal : Math.abs(vKor - vHist);
+        // Zapewnienie błędu absolutnego — ZAWSZE Math.abs(), bo SQL może zwracać wartości ze znakiem
+        const errAbsHres = Math.abs(errAbsHresVal !== null ? errAbsHresVal : vHres - vHist);
+        const errAbsKor = Math.abs(errAbsKorVal !== null ? errAbsKorVal : vKor - vHist);
 
         // Agregacja lokalizacyjna (MAE)
         if (!locMaeData[loc]) {
