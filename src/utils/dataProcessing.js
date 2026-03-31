@@ -27,30 +27,26 @@ export const getAggregatedMetrics = (filteredData) => {
 
     let sumMaeKorekta = 0;
     let sumMaeHres = 0;
-    let numProductionHours = 0;
+    const count = filteredData.length;
 
     filteredData.forEach(row => {
-        // MAE tylko dla godzin dziennych (Val_Historia > 0.1 MW)
-        if (row.Val_Historia > 0.1) {
-            // Używamy pre-kalkulowanych bzęd błądów (blad_abs_*), bo mogą być w DB
-            // Ale na wszelki wypadek robimy Math.abs(), aby DEFINITYWNIE wykluczyć ujemne!
-            const errK = row.Blad_Abs_Korekta !== undefined ? Math.abs(row.Blad_Abs_Korekta) : Math.abs(row.Val_Korekta - row.Val_Historia);
-            const errH = row.Blad_Abs_HRES !== undefined ? Math.abs(row.Blad_Abs_HRES) : Math.abs(row.Val_HRES - row.Val_Historia);
+        // MAE dla wszystkich godzin (Pełny Bilans)
+        // Wymuszamy Math.abs(), aby DEFINITYWNIE wykluczyć ujemne błędy!
+        const errK = row.Blad_Abs_Korekta !== undefined ? Math.abs(row.Blad_Abs_Korekta) : Math.abs(row.Val_Korekta - row.Val_Historia);
+        const errH = row.Blad_Abs_HRES !== undefined ? Math.abs(row.Blad_Abs_HRES) : Math.abs(row.Val_HRES - row.Val_Historia);
 
-            sumMaeKorekta += errK;
-            sumMaeHres += errH;
-            numProductionHours++;
-        }
+        sumMaeKorekta += errK;
+        sumMaeHres += errH;
     });
 
-    const avgMaeKorekta = numProductionHours > 0 ? (sumMaeKorekta / numProductionHours) : 0;
-    const avgMaeHres = numProductionHours > 0 ? (sumMaeHres / numProductionHours) : 0;
+    const avgMaeKorekta = count > 0 ? (sumMaeKorekta / count) : 0;
+    const avgMaeHres = count > 0 ? (sumMaeHres / count) : 0;
 
     return {
         MAE_Korekta: Number(avgMaeKorekta.toFixed(2)),
         MAE_HRES: Number(avgMaeHres.toFixed(2)),
         betterModel: avgMaeKorekta < avgMaeHres ? 'Korekta' : 'HRES',
-        numProductionHours
+        recordCount: count
     };
 };
 

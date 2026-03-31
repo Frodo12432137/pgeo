@@ -21,7 +21,7 @@ const Controls = ({
                     </div>
                     <div>
                         <h1 className="text-xl font-bold text-primary">PGEO Analytics</h1>
-                        <span className="text-[9px] text-muted opacity-60 block -mt-1 uppercase tracking-tighter">v2.2 - MAE FIX</span>
+                        <span className="text-[9px] text-muted opacity-60 block -mt-1 uppercase tracking-tighter">v3.0 - FULL BALANCE MAE</span>
                     </div>
                 </div>
             </div>
