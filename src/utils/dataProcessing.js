@@ -25,28 +25,23 @@ export const getAvailableLocations = (data) => {
 export const getAggregatedMetrics = (filteredData) => {
     if (!filteredData || filteredData.length === 0) return null;
 
-    let sumErrorKorekta = 0;
-    let sumErrorHres = 0;
-    let numProductionHours = 0;
+    let sumMaeKorekta = 0;
+    let sumMaeHres = 0;
+    let sumMapeKorekta = 0;
+    let sumMapeHres = 0;
 
     filteredData.forEach(row => {
-        // Tylko godziny dzienne (Val_Historia > 0.1 MW)
-        if (row.Val_Historia > 0.1) {
-            // Używamy pre-kalkulowanych bzędów bezwzględnych z processRawSQLData (tam jest Math.abs)
-            sumErrorKorekta += row.Blad_Abs_Korekta || 0;
-            sumErrorHres += row.Blad_Abs_HRES || 0;
-            numProductionHours++;
-        }
+        sumMaeKorekta += (row.Val_Korekta - row.Val_Historia);
+        sumMaeHres += (row.Val_HRES - row.Val_Historia);
     });
 
-    const avgMaeKorekta = numProductionHours > 0 ? sumErrorKorekta / numProductionHours : 0;
-    const avgMaeHres = numProductionHours > 0 ? sumErrorHres / numProductionHours : 0;
+    const avgMaeKorekta = sumMaeKorekta / filteredData.length;
+    const avgMaeHres = sumMaeHres / filteredData.length;
 
     return {
-        MAE_Korekta: Number(avgMaeKorekta.toFixed(2)),
-        MAE_HRES: Number(avgMaeHres.toFixed(2)),
-        betterModel: avgMaeKorekta < avgMaeHres ? 'Korekta' : 'HRES',
-        numProductionHours
+        maeKorekta: avgMaeKorekta.toFixed(2),
+        maeHres: avgMaeHres.toFixed(2),
+        betterModel: Math.abs(avgMaeKorekta) < Math.abs(avgMaeHres) ? 'Korekta' : 'HRES'
     };
 };
 
@@ -378,13 +373,13 @@ export const getHistoryComparison = (allData, currentFilteredData) => {
     return [
         {
             name: 'Wybrany Okres',
-            MAE_Korekta: current.MAE_Korekta,
-            MAE_HRES: current.MAE_HRES
+            MAE_Korekta: Number(current.maeKorekta),
+            MAE_HRES: Number(current.maeHres)
         },
         {
             name: 'Historia (12 Miesięcy)',
-            MAE_Korekta: history.MAE_Korekta,
-            MAE_HRES: history.MAE_HRES
+            MAE_Korekta: Number(history.maeKorekta),
+            MAE_HRES: Number(history.maeHres)
         }
     ];
 };
@@ -438,9 +433,9 @@ export const processRawSQLData = (rawData) => {
         const vHres = vHresVal;
         const vKor = vKorVal;
 
-        // Zapewnienie błędu absolutnego — ZAWSZE Math.abs(), bo SQL może zwracać wartości ze znakiem
-        const errAbsHres = Math.abs(errAbsHresVal !== null ? errAbsHresVal : vHres - vHist);
-        const errAbsKor = Math.abs(errAbsKorVal !== null ? errAbsKorVal : vKor - vHist);
+        // Zapewnienie błędu absolutnego (często SQL go oddaje, ale wyliczmy dla pewności)
+        const errAbsHres = errAbsHresVal !== null ? errAbsHresVal : Math.abs(vHres - vHist);
+        const errAbsKor = errAbsKorVal !== null ? errAbsKorVal : Math.abs(vKor - vHist);
 
         // Agregacja lokalizacyjna (MAE)
         if (!locMaeData[loc]) {
