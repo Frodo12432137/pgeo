@@ -25,17 +25,16 @@ export const getAvailableLocations = (data) => {
 export const getAggregatedMetrics = (filteredData) => {
     if (!filteredData || filteredData.length === 0) return null;
 
-    // Prosta kalkulacja MAE: per wiersz (per farma per godzina)
-    // Brak agregacji portfolio — brak efektu znoszenia błędów między farmami.
-    // Tylko godziny dzienne (Val_Historia > 0.1 MW), aby nie zawyżać liczby godzin nocami.
     let sumErrorKorekta = 0;
     let sumErrorHres = 0;
     let numProductionHours = 0;
 
     filteredData.forEach(row => {
+        // Tylko godziny dzienne (Val_Historia > 0.1 MW)
         if (row.Val_Historia > 0.1) {
-            sumErrorKorekta += Math.abs(row.Val_Korekta - row.Val_Historia);
-            sumErrorHres += Math.abs(row.Val_HRES - row.Val_Historia);
+            // Używamy pre-kalkulowanych bzędów bezwzględnych z processRawSQLData (tam jest Math.abs)
+            sumErrorKorekta += row.Blad_Abs_Korekta || 0;
+            sumErrorHres += row.Blad_Abs_HRES || 0;
             numProductionHours++;
         }
     });
@@ -44,8 +43,8 @@ export const getAggregatedMetrics = (filteredData) => {
     const avgMaeHres = numProductionHours > 0 ? sumErrorHres / numProductionHours : 0;
 
     return {
-        maeKorekta: avgMaeKorekta.toFixed(2),
-        maeHres: avgMaeHres.toFixed(2),
+        MAE_Korekta: Number(avgMaeKorekta.toFixed(2)),
+        MAE_HRES: Number(avgMaeHres.toFixed(2)),
         betterModel: avgMaeKorekta < avgMaeHres ? 'Korekta' : 'HRES',
         numProductionHours
     };
@@ -379,13 +378,13 @@ export const getHistoryComparison = (allData, currentFilteredData) => {
     return [
         {
             name: 'Wybrany Okres',
-            MAE_Korekta: Number(current.maeKorekta),
-            MAE_HRES: Number(current.maeHres)
+            MAE_Korekta: current.MAE_Korekta,
+            MAE_HRES: current.MAE_HRES
         },
         {
             name: 'Historia (12 Miesięcy)',
-            MAE_Korekta: Number(history.maeKorekta),
-            MAE_HRES: Number(history.maeHres)
+            MAE_Korekta: history.MAE_Korekta,
+            MAE_HRES: history.MAE_HRES
         }
     ];
 };

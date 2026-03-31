@@ -4,7 +4,7 @@ import { TrendingDown, TrendingUp, Activity } from 'lucide-react';
 const MetricsCards = ({ metrics }) => {
     if (!metrics) return null;
 
-    const diff = Math.abs(metrics.maeKorekta - metrics.maeHres).toFixed(2);
+    const diff = Math.abs(metrics.MAE_Korekta - metrics.MAE_HRES).toFixed(2);
     const isKorektaBetter = metrics.betterModel === 'Korekta';
 
     return (
@@ -16,7 +16,7 @@ const MetricsCards = ({ metrics }) => {
                     <Activity size={20} className="text-accent" />
                 </div>
                 <div className="flex items-end gap-3">
-                    <span className="text-3xl font-bold text-primary">{metrics.maeKorekta} <span className="text-base text-muted font-normal">MW</span></span>
+                    <span className="text-3xl font-bold text-primary">{metrics.MAE_Korekta} <span className="text-base text-muted font-normal">MW</span></span>
                 </div>
                 <p className="text-[10px] text-muted mt-2 italic">* Tylko godziny produkcji ({metrics.numProductionHours}h)</p>
             </div>
@@ -27,7 +27,7 @@ const MetricsCards = ({ metrics }) => {
                     <Activity size={20} className="text-brand" />
                 </div>
                 <div className="flex items-end gap-3">
-                    <span className="text-3xl font-bold text-primary">{metrics.maeHres} <span className="text-base text-muted font-normal">MW</span></span>
+                    <span className="text-3xl font-bold text-primary">{metrics.MAE_HRES} <span className="text-base text-muted font-normal">MW</span></span>
                 </div>
                 <p className="text-[10px] text-muted mt-2 italic">* Tylko godziny produkcji ({metrics.numProductionHours}h)</p>
             </div>
