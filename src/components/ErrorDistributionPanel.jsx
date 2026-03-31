@@ -8,11 +8,13 @@ const ErrorDistributionPanel = ({ data }) => {
         // Group by lokalizacja
         const locations = {};
         data.forEach(row => {
+            // Tylko godziny dzienne (produkcja > 0.1 MW) — nocne zera zaniżały MAE o ~50%
+            if (row.Val_Historia <= 0.1) return;
             if (!locations[row.lokalizacja]) {
                 locations[row.lokalizacja] = { name: row.lokalizacja, sumKorekta: 0, sumHres: 0, count: 0 };
             }
-            locations[row.lokalizacja].sumKorekta += row.Blad_Abs_Korekta;
-            locations[row.lokalizacja].sumHres += row.Blad_Abs_HRES;
+            locations[row.lokalizacja].sumKorekta += Math.abs(row.Blad_Abs_Korekta);
+            locations[row.lokalizacja].sumHres += Math.abs(row.Blad_Abs_HRES);
             locations[row.lokalizacja].count += 1;
         });
 
