@@ -27,21 +27,30 @@ export const getAggregatedMetrics = (filteredData) => {
 
     let sumMaeKorekta = 0;
     let sumMaeHres = 0;
-    let sumMapeKorekta = 0;
-    let sumMapeHres = 0;
+    let numProductionHours = 0;
 
     filteredData.forEach(row => {
-        sumMaeKorekta += (row.Val_Korekta - row.Val_Historia);
-        sumMaeHres += (row.Val_HRES - row.Val_Historia);
+        // MAE tylko dla godzin dziennych (Val_Historia > 0.1 MW)
+        if (row.Val_Historia > 0.1) {
+            // Używamy pre-kalkulowanych bzęd błądów (blad_abs_*), bo mogą być w DB
+            // Ale na wszelki wypadek robimy Math.abs(), aby DEFINITYWNIE wykluczyć ujemne!
+            const errK = row.Blad_Abs_Korekta !== undefined ? Math.abs(row.Blad_Abs_Korekta) : Math.abs(row.Val_Korekta - row.Val_Historia);
+            const errH = row.Blad_Abs_HRES !== undefined ? Math.abs(row.Blad_Abs_HRES) : Math.abs(row.Val_HRES - row.Val_Historia);
+
+            sumMaeKorekta += errK;
+            sumMaeHres += errH;
+            numProductionHours++;
+        }
     });
 
-    const avgMaeKorekta = sumMaeKorekta / filteredData.length;
-    const avgMaeHres = sumMaeHres / filteredData.length;
+    const avgMaeKorekta = numProductionHours > 0 ? (sumMaeKorekta / numProductionHours) : 0;
+    const avgMaeHres = numProductionHours > 0 ? (sumMaeHres / numProductionHours) : 0;
 
     return {
-        maeKorekta: avgMaeKorekta.toFixed(2),
-        maeHres: avgMaeHres.toFixed(2),
-        betterModel: Math.abs(avgMaeKorekta) < Math.abs(avgMaeHres) ? 'Korekta' : 'HRES'
+        MAE_Korekta: Number(avgMaeKorekta.toFixed(2)),
+        MAE_HRES: Number(avgMaeHres.toFixed(2)),
+        betterModel: avgMaeKorekta < avgMaeHres ? 'Korekta' : 'HRES',
+        numProductionHours
     };
 };
 
@@ -373,13 +382,13 @@ export const getHistoryComparison = (allData, currentFilteredData) => {
     return [
         {
             name: 'Wybrany Okres',
-            MAE_Korekta: Number(current.maeKorekta),
-            MAE_HRES: Number(current.maeHres)
+            MAE_Korekta: current.MAE_Korekta,
+            MAE_HRES: current.MAE_HRES
         },
         {
             name: 'Historia (12 Miesięcy)',
-            MAE_Korekta: Number(history.maeKorekta),
-            MAE_HRES: Number(history.maeHres)
+            MAE_Korekta: history.MAE_Korekta,
+            MAE_HRES: history.MAE_HRES
         }
     ];
 };

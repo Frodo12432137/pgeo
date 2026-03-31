@@ -19,7 +19,10 @@ const Controls = ({
                             <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
                         </svg>
                     </div>
-                    <h1 className="text-xl font-bold text-primary">PGEO Analytics</h1>
+                    <div>
+                        <h1 className="text-xl font-bold text-primary">PGEO Analytics</h1>
+                        <span className="text-[9px] text-muted opacity-60 block -mt-1 uppercase tracking-tighter">v2.2 - MAE FIX</span>
+                    </div>
                 </div>
             </div>
 
