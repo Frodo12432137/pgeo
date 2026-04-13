@@ -18,7 +18,7 @@ const HourlyErrorsChart = ({ data, selectedLocation }) => {
         // Sort logic to ensure consecutive timestamps
         const sorted = [...data].sort((a, b) => safeDate(a.dataGodzinaUTC) - safeDate(b.dataGodzinaUTC));
 
-        // If we have data from multiple locations for the identical hour, we should aggregate them.
+        // Puzzlujemy po godzinie
         const groupedByHour = {};
         sorted.forEach(row => {
             const time = row.dataGodzinaUTC;
@@ -26,19 +26,15 @@ const HourlyErrorsChart = ({ data, selectedLocation }) => {
                 groupedByHour[time] = { 
                     time, 
                     sumValKorekta: 0, sumValHres: 0, sumHistoria: 0,
-                    sumBladKorekta: 0, sumBladHres: 0,
                     count: 0 
                 };
             }
+            
+            // Zgodnie z wytyczną: bierzemy total predykcji, total wykonania i z tego liczymy błąd
             groupedByHour[time].sumValKorekta += row.Val_Korekta;
             groupedByHour[time].sumValHres += row.Val_HRES;
             groupedByHour[time].sumHistoria += row.Val_Historia;
             
-            const errK = row.Blad_Abs_Korekta !== undefined ? Math.abs(row.Blad_Abs_Korekta) : Math.abs(row.Val_Korekta - row.Val_Historia);
-            const errH = row.Blad_Abs_HRES !== undefined ? Math.abs(row.Blad_Abs_HRES) : Math.abs(row.Val_HRES - row.Val_Historia);
-            
-            groupedByHour[time].sumBladKorekta += errK;
-            groupedByHour[time].sumBladHres += errH;
             groupedByHour[time].count += 1;
         });
 
@@ -47,10 +43,8 @@ const HourlyErrorsChart = ({ data, selectedLocation }) => {
             return {
                 time: item.time,
                 displayTime: format(dateObj, 'dd MMM HH:mm', { locale: pl }),
-                "Korekta (Suma)": Number(Math.abs(item.sumValKorekta - item.sumHistoria).toFixed(2)),
-                "HRES (Suma)": Number(Math.abs(item.sumValHres - item.sumHistoria).toFixed(2)),
-                "Korekta (Śr. z lok.)": Number((item.sumBladKorekta / item.count).toFixed(2)),
-                "HRES (Śr. z lok.)": Number((item.sumBladHres / item.count).toFixed(2))
+                "Korekta": Number(Math.abs(item.sumValKorekta - item.sumHistoria).toFixed(2)),
+                "HRES": Number(Math.abs(item.sumValHres - item.sumHistoria).toFixed(2))
             };
         });
 
@@ -63,13 +57,13 @@ const HourlyErrorsChart = ({ data, selectedLocation }) => {
         return aggregated;
     }, [data]);
 
-    const showLocationAverage = selectedLocation === 'Wszystkie';
+    const isSum = selectedLocation === 'Wszystkie';
 
     return (
         <div className="glass-panel col-span-12 flex flex-col">
             <h3 className="text-lg font-semibold mb-1 text-primary">Przebieg godzinowy - Odchylenia Absolutne</h3>
             <p className="text-sm text-muted mb-4">
-                {showLocationAverage ? 'Porównanie błędu sumy całego bilansu oraz średniego błędu pojedynczego oddziału' : 'Wartości dla wybranego filtru'}
+                {isSum ? 'Błąd na sumie bilansu całego portfela (MW)' : 'Wartości dla wybranego filtru'}
             </p>
 
             <div className="flex-1 w-full min-h-[350px]">
@@ -98,40 +92,20 @@ const HourlyErrorsChart = ({ data, selectedLocation }) => {
                         <Legend wrapperStyle={{ paddingTop: '10px' }} />
                         <Line
                             type="monotone"
-                            dataKey="Korekta (Suma)"
+                            dataKey="Korekta"
                             stroke="var(--color-accent)"
-                            strokeWidth={showLocationAverage ? 3 : 2}
+                            strokeWidth={2}
                             dot={false}
                             activeDot={{ r: 6 }}
                         />
                         <Line
                             type="monotone"
-                            dataKey="HRES (Suma)"
+                            dataKey="HRES"
                             stroke="var(--color-brand)"
-                            strokeWidth={showLocationAverage ? 3 : 2}
+                            strokeWidth={2}
                             dot={false}
                             activeDot={{ r: 6 }}
                         />
-                        {showLocationAverage && (
-                            <>
-                                <Line
-                                    type="monotone"
-                                    dataKey="Korekta (Śr. z lok.)"
-                                    stroke="var(--color-accent)"
-                                    strokeDasharray="5 5"
-                                    strokeWidth={1}
-                                    dot={false}
-                                />
-                                <Line
-                                    type="monotone"
-                                    dataKey="HRES (Śr. z lok.)"
-                                    stroke="var(--color-brand)"
-                                    strokeDasharray="5 5"
-                                    strokeWidth={1}
-                                    dot={false}
-                                />
-                            </>
-                        )}
                     </LineChart>
                 </ResponsiveContainer>
             </div>

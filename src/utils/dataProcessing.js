@@ -29,12 +29,12 @@ export const getAggregatedMetrics = (filteredData) => {
     filteredData.forEach(row => {
         const time = row.dataGodzinaUTC;
         if (!groupedByHour[time]) {
-            groupedByHour[time] = { sumKorekta: 0, sumHres: 0, sumHistoria: 0, count: 0 };
+            groupedByHour[time] = { sumKorekta: 0, sumHres: 0, sumHistoria: 0 };
         }
+        
         groupedByHour[time].sumKorekta += row.Val_Korekta;
         groupedByHour[time].sumHres += row.Val_HRES;
         groupedByHour[time].sumHistoria += row.Val_Historia;
-        groupedByHour[time].count += 1;
     });
 
     let sumMaeKorektaOnSum = 0;
@@ -43,11 +43,12 @@ export const getAggregatedMetrics = (filteredData) => {
     const hoursCount = hours.length;
 
     hours.forEach(hour => {
-        // Błąd wyliczany na sumie bilansu wykonania i modeli dla danej godziny
+        // Liczymy różnicę z wyciągniętych wcześniej sum (wykonania i predykcji) dla danej godziny
         sumMaeKorektaOnSum += Math.abs(hour.sumKorekta - hour.sumHistoria);
         sumMaeHresOnSum += Math.abs(hour.sumHres - hour.sumHistoria);
     });
 
+    // Uśredniamy sumę tych błędów z poszczególnych godzin
     const avgMaeKorektaSum = hoursCount > 0 ? (sumMaeKorektaOnSum / hoursCount) : 0;
     const avgMaeHresSum = hoursCount > 0 ? (sumMaeHresOnSum / hoursCount) : 0;
 
@@ -377,23 +378,31 @@ export const getWorstDays = (data, limit = 10) => {
 export const getHistoryComparison = (allData, currentFilteredData) => {
     if (!allData || !currentFilteredData || currentFilteredData.length === 0) return null;
 
+    // Pobieramy tylko lokalizacje, które są aktualnie widoczne na filtrze
+    const currentLocations = new Set(currentFilteredData.map(r => r.lokalizacja));
+    const isWszystkie = currentLocations.size === getAvailableLocations(allData).length;
+    
+    const historyData = isWszystkie 
+        ? allData 
+        : allData.filter(r => currentLocations.has(r.lokalizacja));
+
     // Obliczamy statystyki dla aktualnego przefiltrowanego okresu
     const current = getAggregatedMetrics(currentFilteredData);
 
-    // Obliczamy statystyki dla całych 12 miesięcy
-    const history = getAggregatedMetrics(allData);
+    // Obliczamy statystyki historyczne, ale TYLKO dla wybranych farm
+    const history = getAggregatedMetrics(historyData);
 
     // Zwracamy paczkę gotową np. dla BarCharta lub kart porównawczych
     return [
         {
             name: 'Wybrany Okres',
-            MAE_Korekta: current.MAE_Korekta,
-            MAE_HRES: current.MAE_HRES
+            MAE_Korekta: current ? current.MAE_Korekta : 0,
+            MAE_HRES: current ? current.MAE_HRES : 0
         },
         {
             name: 'Historia (12 Miesięcy)',
-            MAE_Korekta: history.MAE_Korekta,
-            MAE_HRES: history.MAE_HRES
+            MAE_Korekta: history ? history.MAE_Korekta : 0,
+            MAE_HRES: history ? history.MAE_HRES : 0
         }
     ];
 };
