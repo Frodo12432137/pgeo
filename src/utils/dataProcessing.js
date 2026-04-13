@@ -25,28 +25,37 @@ export const getAvailableLocations = (data) => {
 export const getAggregatedMetrics = (filteredData) => {
     if (!filteredData || filteredData.length === 0) return null;
 
-    let sumMaeKorekta = 0;
-    let sumMaeHres = 0;
-    const count = filteredData.length;
-
+    const groupedByHour = {};
     filteredData.forEach(row => {
-        // MAE dla wszystkich godzin (Pełny Bilans)
-        // Wymuszamy Math.abs(), aby DEFINITYWNIE wykluczyć ujemne błędy!
-        const errK = row.Blad_Abs_Korekta !== undefined ? Math.abs(row.Blad_Abs_Korekta) : Math.abs(row.Val_Korekta - row.Val_Historia);
-        const errH = row.Blad_Abs_HRES !== undefined ? Math.abs(row.Blad_Abs_HRES) : Math.abs(row.Val_HRES - row.Val_Historia);
-
-        sumMaeKorekta += errK;
-        sumMaeHres += errH;
+        const time = row.dataGodzinaUTC;
+        if (!groupedByHour[time]) {
+            groupedByHour[time] = { sumKorekta: 0, sumHres: 0, sumHistoria: 0, count: 0 };
+        }
+        groupedByHour[time].sumKorekta += row.Val_Korekta;
+        groupedByHour[time].sumHres += row.Val_HRES;
+        groupedByHour[time].sumHistoria += row.Val_Historia;
+        groupedByHour[time].count += 1;
     });
 
-    const avgMaeKorekta = count > 0 ? (sumMaeKorekta / count) : 0;
-    const avgMaeHres = count > 0 ? (sumMaeHres / count) : 0;
+    let sumMaeKorektaOnSum = 0;
+    let sumMaeHresOnSum = 0;
+    const hours = Object.values(groupedByHour);
+    const hoursCount = hours.length;
+
+    hours.forEach(hour => {
+        // Błąd wyliczany na sumie bilansu wykonania i modeli dla danej godziny
+        sumMaeKorektaOnSum += Math.abs(hour.sumKorekta - hour.sumHistoria);
+        sumMaeHresOnSum += Math.abs(hour.sumHres - hour.sumHistoria);
+    });
+
+    const avgMaeKorektaSum = hoursCount > 0 ? (sumMaeKorektaOnSum / hoursCount) : 0;
+    const avgMaeHresSum = hoursCount > 0 ? (sumMaeHresOnSum / hoursCount) : 0;
 
     return {
-        MAE_Korekta: Number(avgMaeKorekta.toFixed(2)),
-        MAE_HRES: Number(avgMaeHres.toFixed(2)),
-        betterModel: avgMaeKorekta < avgMaeHres ? 'Korekta' : 'HRES',
-        recordCount: count
+        MAE_Korekta: Number(avgMaeKorektaSum.toFixed(2)),
+        MAE_HRES: Number(avgMaeHresSum.toFixed(2)),
+        betterModel: avgMaeKorektaSum < avgMaeHresSum ? 'Korekta' : 'HRES',
+        recordCount: filteredData.length
     };
 };
 

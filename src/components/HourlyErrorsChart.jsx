@@ -3,7 +3,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsi
 import { format, parseISO } from 'date-fns';
 import { pl } from 'date-fns/locale';
 
-const HourlyErrorsChart = ({ data }) => {
+const HourlyErrorsChart = ({ data, selectedLocation }) => {
     // Dla czytelności, jeśli danych jest za dużo (> 500 punktów), weźmiemy tylko co N-ty punkt lub zagregujemy.
     const chartData = useMemo(() => {
         if (!data || data.length === 0) return [];
@@ -18,16 +18,27 @@ const HourlyErrorsChart = ({ data }) => {
         // Sort logic to ensure consecutive timestamps
         const sorted = [...data].sort((a, b) => safeDate(a.dataGodzinaUTC) - safeDate(b.dataGodzinaUTC));
 
-        // If we have data from multiple locations for the identical hour, we should average them.
+        // If we have data from multiple locations for the identical hour, we should aggregate them.
         const groupedByHour = {};
         sorted.forEach(row => {
             const time = row.dataGodzinaUTC;
             if (!groupedByHour[time]) {
-                groupedByHour[time] = { time, sumKorekta: 0, sumHres: 0, count: 0, historia: 0 };
+                groupedByHour[time] = { 
+                    time, 
+                    sumValKorekta: 0, sumValHres: 0, sumHistoria: 0,
+                    sumBladKorekta: 0, sumBladHres: 0,
+                    count: 0 
+                };
             }
-            groupedByHour[time].sumKorekta += row.Blad_Abs_Korekta;
-            groupedByHour[time].sumHres += row.Blad_Abs_HRES;
-            groupedByHour[time].historia += row.Val_Historia;
+            groupedByHour[time].sumValKorekta += row.Val_Korekta;
+            groupedByHour[time].sumValHres += row.Val_HRES;
+            groupedByHour[time].sumHistoria += row.Val_Historia;
+            
+            const errK = row.Blad_Abs_Korekta !== undefined ? Math.abs(row.Blad_Abs_Korekta) : Math.abs(row.Val_Korekta - row.Val_Historia);
+            const errH = row.Blad_Abs_HRES !== undefined ? Math.abs(row.Blad_Abs_HRES) : Math.abs(row.Val_HRES - row.Val_Historia);
+            
+            groupedByHour[time].sumBladKorekta += errK;
+            groupedByHour[time].sumBladHres += errH;
             groupedByHour[time].count += 1;
         });
 
@@ -36,9 +47,10 @@ const HourlyErrorsChart = ({ data }) => {
             return {
                 time: item.time,
                 displayTime: format(dateObj, 'dd MMM HH:mm', { locale: pl }),
-                Korekta: Number((item.sumKorekta / item.count).toFixed(2)),
-                HRES: Number((item.sumHres / item.count).toFixed(2)),
-                Historia: Number((item.historia / item.count).toFixed(2))
+                "Korekta (Suma)": Number(Math.abs(item.sumValKorekta - item.sumHistoria).toFixed(2)),
+                "HRES (Suma)": Number(Math.abs(item.sumValHres - item.sumHistoria).toFixed(2)),
+                "Korekta (Śr. z lok.)": Number((item.sumBladKorekta / item.count).toFixed(2)),
+                "HRES (Śr. z lok.)": Number((item.sumBladHres / item.count).toFixed(2))
             };
         });
 
@@ -51,10 +63,14 @@ const HourlyErrorsChart = ({ data }) => {
         return aggregated;
     }, [data]);
 
+    const showLocationAverage = selectedLocation === 'Wszystkie';
+
     return (
         <div className="glass-panel col-span-12 flex flex-col">
-            <h3 className="text-lg font-semibold mb-1 text-primary">Przebieg godzinowy - MAE</h3>
-            <p className="text-sm text-muted mb-4">Uśrednione wartości dla wybranego filtru</p>
+            <h3 className="text-lg font-semibold mb-1 text-primary">Przebieg godzinowy - Odchylenia Absolutne</h3>
+            <p className="text-sm text-muted mb-4">
+                {showLocationAverage ? 'Porównanie błędu sumy całego bilansu oraz średniego błędu pojedynczego oddziału' : 'Wartości dla wybranego filtru'}
+            </p>
 
             <div className="flex-1 w-full min-h-[350px]">
                 <ResponsiveContainer width="100%" height="100%">
@@ -82,20 +98,40 @@ const HourlyErrorsChart = ({ data }) => {
                         <Legend wrapperStyle={{ paddingTop: '10px' }} />
                         <Line
                             type="monotone"
-                            dataKey="Korekta"
+                            dataKey="Korekta (Suma)"
                             stroke="var(--color-accent)"
-                            strokeWidth={2}
+                            strokeWidth={showLocationAverage ? 3 : 2}
                             dot={false}
                             activeDot={{ r: 6 }}
                         />
                         <Line
                             type="monotone"
-                            dataKey="HRES"
+                            dataKey="HRES (Suma)"
                             stroke="var(--color-brand)"
-                            strokeWidth={2}
+                            strokeWidth={showLocationAverage ? 3 : 2}
                             dot={false}
                             activeDot={{ r: 6 }}
                         />
+                        {showLocationAverage && (
+                            <>
+                                <Line
+                                    type="monotone"
+                                    dataKey="Korekta (Śr. z lok.)"
+                                    stroke="var(--color-accent)"
+                                    strokeDasharray="5 5"
+                                    strokeWidth={1}
+                                    dot={false}
+                                />
+                                <Line
+                                    type="monotone"
+                                    dataKey="HRES (Śr. z lok.)"
+                                    stroke="var(--color-brand)"
+                                    strokeDasharray="5 5"
+                                    strokeWidth={1}
+                                    dot={false}
+                                />
+                            </>
+                        )}
                     </LineChart>
                 </ResponsiveContainer>
             </div>

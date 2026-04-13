@@ -3,7 +3,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsi
 import { format } from 'date-fns';
 import { pl } from 'date-fns/locale';
 
-const HourlyValuesChart = ({ data }) => {
+const HourlyValuesChart = ({ data, selectedLocation }) => {
     const chartData = useMemo(() => {
         if (!data || data.length === 0) return [];
 
@@ -19,12 +19,11 @@ const HourlyValuesChart = ({ data }) => {
         sorted.forEach(row => {
             const time = row.dataGodzinaUTC;
             if (!groupedByHour[time]) {
-                groupedByHour[time] = { time, sumKorekta: 0, sumHres: 0, sumHistoria: 0, count: 0 };
+                groupedByHour[time] = { time, sumKorekta: 0, sumHres: 0, sumHistoria: 0 };
             }
             groupedByHour[time].sumKorekta += row.Val_Korekta;
             groupedByHour[time].sumHres += row.Val_HRES;
             groupedByHour[time].sumHistoria += row.Val_Historia;
-            groupedByHour[time].count += 1;
         });
 
         const aggregated = Object.values(groupedByHour).map(item => {
@@ -32,9 +31,9 @@ const HourlyValuesChart = ({ data }) => {
             return {
                 time: item.time,
                 displayTime: format(dateObj, 'dd MMM HH:mm', { locale: pl }),
-                Korekta: Number((item.sumKorekta / item.count).toFixed(2)),
-                HRES: Number((item.sumHres / item.count).toFixed(2)),
-                Wykonanie: Number((item.sumHistoria / item.count).toFixed(2))
+                Korekta: Number(item.sumKorekta.toFixed(2)),
+                HRES: Number(item.sumHres.toFixed(2)),
+                Wykonanie: Number(item.sumHistoria.toFixed(2))
             };
         });
 
@@ -46,10 +45,14 @@ const HourlyValuesChart = ({ data }) => {
         return aggregated;
     }, [data]);
 
+    const isSum = selectedLocation === 'Wszystkie';
+
     return (
         <div className="glass-panel col-span-12 flex flex-col mt-6">
             <h3 className="text-lg font-semibold mb-1 text-primary">Przebieg godzinowy - Wartości (Wykonanie vs Modele)</h3>
-            <p className="text-sm text-muted mb-4">Uśrednione wartości dla wybranego filtru</p>
+            <p className="text-sm text-muted mb-4">
+                {isSum ? 'Suma bilansu dla wszystkich oddziałów (MW)' : 'Wartości dla wybranego oddziału (MW)'}
+            </p>
 
             <div className="flex-1 w-full min-h-[350px]">
                 <ResponsiveContainer width="100%" height="100%">

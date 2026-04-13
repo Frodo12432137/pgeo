@@ -259,10 +259,10 @@ function App() {
             </div>
 
             {/* Wykres godzinowy */}
-            <HourlyErrorsChart data={filteredData} />
+            <HourlyErrorsChart data={filteredData} selectedLocation={selectedLocation} />
 
             {/* Wykres godzinowy (wartości) */}
-            <HourlyValuesChart data={filteredData} />
+            <HourlyValuesChart data={filteredData} selectedLocation={selectedLocation} />
 
             {/* --- SEKCJA POGODOWA (FOCUS HRES) --- */}
             <div className="col-span-12 mt-8 mb-2">
