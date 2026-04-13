@@ -25,16 +25,18 @@ const HourlyErrorsChart = ({ data, selectedLocation }) => {
             if (!groupedByHour[time]) {
                 groupedByHour[time] = { 
                     time, 
-                    sumValKorekta: 0, sumValHres: 0, sumHistoria: 0,
+                    sumBladKorekta: 0, sumBladHres: 0,
                     count: 0 
                 };
             }
             
-            // Zgodnie z wytyczną: bierzemy total predykcji, total wykonania i z tego liczymy błąd
-            groupedByHour[time].sumValKorekta += row.Val_Korekta;
-            groupedByHour[time].sumValHres += row.Val_HRES;
-            groupedByHour[time].sumHistoria += row.Val_Historia;
+            // WARIANT B: Brutalnie dodajemy do siebie błędy każdego oddziału
+            // Oddaje to rzeczywiste natężenie wolumenu na Rynku Bilansującym.
+            const errK = (row.Blad_Abs_Korekta !== undefined && row.Blad_Abs_Korekta !== null) ? Math.abs(row.Blad_Abs_Korekta) : Math.abs(row.Val_Korekta - row.Val_Historia);
+            const errH = (row.Blad_Abs_HRES !== undefined && row.Blad_Abs_HRES !== null) ? Math.abs(row.Blad_Abs_HRES) : Math.abs(row.Val_HRES - row.Val_Historia);
             
+            groupedByHour[time].sumBladKorekta += errK;
+            groupedByHour[time].sumBladHres += errH;
             groupedByHour[time].count += 1;
         });
 
@@ -43,8 +45,8 @@ const HourlyErrorsChart = ({ data, selectedLocation }) => {
             return {
                 time: item.time,
                 displayTime: format(dateObj, 'dd MMM HH:mm', { locale: pl }),
-                "Korekta": Number(Math.abs(item.sumValKorekta - item.sumHistoria).toFixed(2)),
-                "HRES": Number(Math.abs(item.sumValHres - item.sumHistoria).toFixed(2))
+                "Korekta": Number(item.sumBladKorekta.toFixed(2)),
+                "HRES": Number(item.sumBladHres.toFixed(2))
             };
         });
 
@@ -63,7 +65,7 @@ const HourlyErrorsChart = ({ data, selectedLocation }) => {
         <div className="glass-panel col-span-12 flex flex-col">
             <h3 className="text-lg font-semibold mb-1 text-primary">Przebieg godzinowy - Odchylenia Absolutne</h3>
             <p className="text-sm text-muted mb-4">
-                {isSum ? 'Błąd na sumie bilansu całego portfela (MW)' : 'Wartości dla wybranego filtru'}
+                {isSum ? 'Całkowity wolumen błędów (Suma błędów absolutnych z oddziałów) MW' : 'Wartości dla wybranego filtru'}
             </p>
 
             <div className="flex-1 w-full min-h-[350px]">

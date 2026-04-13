@@ -29,28 +29,33 @@ export const getAggregatedMetrics = (filteredData) => {
     filteredData.forEach(row => {
         const time = row.dataGodzinaUTC;
         if (!groupedByHour[time]) {
-            groupedByHour[time] = { sumKorekta: 0, sumHres: 0, sumHistoria: 0 };
+            groupedByHour[time] = { sumBladKorekta: 0, sumBladHres: 0, count: 0 };
         }
         
-        groupedByHour[time].sumKorekta += row.Val_Korekta;
-        groupedByHour[time].sumHres += row.Val_HRES;
-        groupedByHour[time].sumHistoria += row.Val_Historia;
+        // WARIANT B: Szef ma rację! Z biznesowego punktu widzenia liczy się suma wolumenów odchyleń 
+        // ze wszystkich farm, za które będzie trzeba zapłacić kary (błędów nie można kompensować między lokacjami).
+        const errK = (row.Blad_Abs_Korekta !== undefined && row.Blad_Abs_Korekta !== null) ? Math.abs(row.Blad_Abs_Korekta) : Math.abs(row.Val_Korekta - row.Val_Historia);
+        const errH = (row.Blad_Abs_HRES !== undefined && row.Blad_Abs_HRES !== null) ? Math.abs(row.Blad_Abs_HRES) : Math.abs(row.Val_HRES - row.Val_Historia);
+
+        groupedByHour[time].sumBladKorekta += errK;
+        groupedByHour[time].sumBladHres += errH;
+        groupedByHour[time].count += 1;
     });
 
-    let sumMaeKorektaOnSum = 0;
-    let sumMaeHresOnSum = 0;
+    let totalMaeKorektaOnSum = 0;
+    let totalMaeHresOnSum = 0;
     const hours = Object.values(groupedByHour);
     const hoursCount = hours.length;
 
     hours.forEach(hour => {
-        // Liczymy różnicę z wyciągniętych wcześniej sum (wykonania i predykcji) dla danej godziny
-        sumMaeKorektaOnSum += Math.abs(hour.sumKorekta - hour.sumHistoria);
-        sumMaeHresOnSum += Math.abs(hour.sumHres - hour.sumHistoria);
+        // Zbieramy całkowity zsumowany błąd wolumenowy dla danej godziny (bez ucinania plusów z minusami)
+        totalMaeKorektaOnSum += hour.sumBladKorekta;
+        totalMaeHresOnSum += hour.sumBladHres;
     });
 
-    // Uśredniamy sumę tych błędów z poszczególnych godzin
-    const avgMaeKorektaSum = hoursCount > 0 ? (sumMaeKorektaOnSum / hoursCount) : 0;
-    const avgMaeHresSum = hoursCount > 0 ? (sumMaeHresOnSum / hoursCount) : 0;
+    // Średnia wolumenowa rozłożona na wszystkie godziny wybranego okresu
+    const avgMaeKorektaSum = hoursCount > 0 ? (totalMaeKorektaOnSum / hoursCount) : 0;
+    const avgMaeHresSum = hoursCount > 0 ? (totalMaeHresOnSum / hoursCount) : 0;
 
     return {
         MAE_Korekta: Number(avgMaeKorektaSum.toFixed(2)),
